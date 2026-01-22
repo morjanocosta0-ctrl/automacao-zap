@@ -1,63 +1,26 @@
-const axios = require('axios');
+name: Disparo de Mensagens Sexta
+on:
+  schedule:
+    - cron: '0 19 * * 5'
+  workflow_dispatch:
 
-async function executar() {
-    // Busca as chaves de segurança configuradas no GitHub Secrets
-    const NINSAUDE_API_KEY = process.env.NINSAUDE_TOKEN;
-    const WHAPI_TOKEN = process.env.WHAPI_TOKEN;
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v3
 
-    // CONFIGURAÇÃO DE TESTE: O robô enviará apenas para este número
-    const TELEFONE_TESTE = '5561995553393'; 
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
-    try {
-        console.log("Conectando à API do Ninsaúde...");
+      - name: Instalar dependencias
+        run: npm install
 
-        // 1. Busca os agendamentos no sistema médico
-        const response = await axios.get('https://api.ninsaude.com/v1/agendamentos', {
-            headers: { 'Authorization': `Bearer ${NINSAUDE_API_KEY}` }
-        });
-
-        const agendamentos = response.data; 
-
-        if (!agendamentos || agendamentos.length === 0) {
-            console.log("Atenção: Nenhum agendamento foi retornado pela API do Ninsaúde.");
-            return;
-        }
-
-        // Seleciona o primeiro paciente da lista para extrair os dados de teste
-        const item = agendamentos[0];
-
-        // Montagem da mensagem conforme o modelo da Clínica Nest
-        const mensagem = `Olá, ${item.paciente_nome}!\n\nConfirme seu agendamento na Clínica Nest - Intervenção Comportamental em ${item.atendimento_data}, às ${item.atendimento_hora}, pelo link ${item.confirmacao_link}!\n\nAgradecemos desde já!\nQualquer dúvida, estamos à disposição.`;
-        
-        console.log(`Dados do paciente ${item.paciente_nome} obtidos. Enviando para o seu WhatsApp de teste...`);
-
-        try {
-            // 2. Envio da mensagem via Whapi.Cloud
-            await axios.post('https://gate.whapi.cloud/messages/text', {
-                to: TELEFONE_TESTE,
-                body: mensagem
-            }, {
-                headers: { 
-                    'Authorization': `Bearer ${WHAPI_TOKEN}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            console.log(`✅ SUCESSO! A mensagem de teste foi enviada para ${TELEFONE_TESTE}.`);
-            console.log("Verifique se o nome, data e link aparecem corretamente no seu celular.");
-            
-        } catch (errorEnvio) {
-            console.error(`❌ Erro no Whapi:`, errorEnvio.response ? errorEnvio.response.data : errorEnvio.message);
-        }
-
-    } catch (error) {
-        // Caso o token do Ninsaúde tenha expirado (lembre-se do limite de 15 min), o erro aparecerá aqui
-        console.error("Erro ao acessar Ninsaúde:", error.message);
-        if (error.response && error.response.status === 401) {
-            console.error("Dica: Seu token do Ninsaúde pode ter expirado. Gere um novo no painel deles.");
-        }
-    }
-}
-
-// Inicia a execução do robô
-executar();
+      - name: Executar script
+        run: node index.js
+        env:
+          NINSAUDE_TOKEN: ${{ secrets.NINSAUDE_TOKEN }}
+          WHAPI_TOKEN: ${{ secrets.WHAPI_TOKEN }}
