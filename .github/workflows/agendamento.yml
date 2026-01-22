@@ -1,19 +1,60 @@
-name: Disparo de Mensagens Sexta
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 19 * * 5'
+const axios = require('axios');
 
-jobs:
-  rodar:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      - run: npm install
-      - run: node index.js
-        env:
-          NINSAUDE_TOKEN: ${{ secrets.NINSAUDE_TOKEN }}
-          WHAPI_TOKEN: ${{ secrets.WHAPI_TOKEN }}
+async function executar() {
+    const NINSAUDE_API_KEY = process.env.NINSAUDE_TOKEN;
+    const WHAPI_TOKEN = process.env.WHAPI_TOKEN;
+    
+    // Seu número configurado para o teste
+    const MEU_NUMERO = '5561995553393'; 
+
+    try {
+        console.log("1. Iniciando conexão com a API do Ninsaúde...");
+        
+        const response = await axios.get('https://api.ninsaude.com/v1/agendamentos', {
+            headers: { 'Authorization': `Bearer ${NINSAUDE_API_KEY}` }
+        });
+
+        const agendamentos = response.data;
+
+        // Verifica se a API retornou algo
+        if (!agendamentos || agendamentos.length === 0) {
+            console.log("⚠️ O Ninsaúde não retornou nenhum agendamento na lista.");
+            return;
+        }
+
+        // Pega o primeiro paciente da lista para testar os dados
+        const item = agendamentos[0];
+        console.log(`2. Dados extraídos com sucesso para o paciente: ${item.paciente_nome}`);
+
+        // Montagem da mensagem oficial da Clínica Nest
+        const mensagem = `Olá, ${item.paciente_nome}!\n\nConfirme seu agendamento na Clínica Nest - Intervenção Comportamental em ${item.atendimento_data}, às ${item.atendimento_hora}, pelo link ${item.confirmacao_link}!\n\nAgradecemos desde já!\nQualquer dúvida, estamos à disposição.`;
+
+        console.log("3. Enviando para o Whapi...");
+
+        await axios.post('https://gate.whapi.cloud/messages/text', {
+            to: MEU_NUMERO,
+            body: mensagem
+        }, {
+            headers: { 
+                'Authorization': `Bearer ${WHAPI_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log("✅ PROCESSO CONCLUÍDO: Verifique seu WhatsApp!");
+
+    } catch (error) {
+        console.error("❌ OCORREU UM ERRO:");
+        if (error.response) {
+            console.error(`Status: ${error.response.status}`);
+            console.error(`Dados: ${JSON.stringify(error.response.data)}`);
+            if(error.response.status === 401) {
+                console.error("DICA: Seu Token do Ninsaúde expirou. Gere um novo.");
+            }
+        } else {
+            console.error(error.message);
+        }
+    }
+}
+
+executar();
