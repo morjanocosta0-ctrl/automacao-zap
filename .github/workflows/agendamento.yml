@@ -1,26 +1,43 @@
-name: Disparo de Mensagens Sexta
-on:
-  schedule:
-    - cron: '0 19 * * 5'
-  workflow_dispatch:
+const axios = require('axios');
 
-jobs:
-  rodar:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout do codigo
-        uses: actions/checkout@v3
+async function executar() {
+    const NINSAUDE_API_KEY = process.env.NINSAUDE_TOKEN;
+    const WHAPI_TOKEN = process.env.WHAPI_TOKEN;
+    const TELEFONE_TESTE = '5561995553393'; 
 
-      - name: Configurar Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
+    try {
+        console.log("--- DEBUG: Iniciando conexão ---");
+        const response = await axios.get('https://api.ninsaude.com/v1/agendamentos', {
+            headers: { 'Authorization': `Bearer ${NINSAUDE_API_KEY}` }
+        });
 
-      - name: Instalar dependencias
-        run: npm install
+        console.log("Dados recebidos do Ninsaúde:", JSON.stringify(response.data));
 
-      - name: Executar script
-        run: node index.js
-        env:
-          NINSAUDE_TOKEN: ${{ secrets.NINSAUDE_TOKEN }}
-          WHAPI_TOKEN: ${{ secrets.WHAPI_TOKEN }}
+        if (!response.data || response.data.length === 0) {
+            console.log("❌ ERRO: A lista do Ninsaúde veio VAZIA.");
+            return;
+        }
+
+        const item = response.data[0];
+        console.log(`Tentando enviar para: ${TELEFONE_TESTE} usando dados de: ${item.paciente_nome}`);
+
+        const resWhapi = await axios.post('https://gate.whapi.cloud/messages/text', {
+            to: TELEFONE_TESTE,
+            body: `Teste Clínico: Olá ${item.paciente_nome}!`
+        }, {
+            headers: { 'Authorization': `Bearer ${WHAPI_TOKEN}` }
+        });
+
+        console.log("Resposta do Whapi:", resWhapi.data);
+
+    } catch (error) {
+        console.error("❌ FALHA NO PROCESSO:");
+        if (error.response) {
+            console.error("Status do Erro:", error.response.status);
+            console.error("Mensagem da API:", error.response.data);
+        } else {
+            console.error(error.message);
+        }
+    }
+}
+executar();
