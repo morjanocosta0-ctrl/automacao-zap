@@ -43,3 +43,10 @@ async function executar() {
         } catch (errorEnvio) {
             console.error(`❌ Erro no Whapi:`, errorEnvio.response ? errorEnvio.response.data : errorEnvio.message);
         }
+
+    } catch (error) {
+        console.error("Erro no Ninsaúde:", error.message);
+    }
+}
+
+executar();
